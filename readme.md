@@ -5,6 +5,9 @@ terminal based river rider game
 # how to run?
 > cargo run
 
+# implemented concepts:
+ - player actor can move inside the world
+ - simple river map is generating inside the world
 
 # how to play?
  - move :
