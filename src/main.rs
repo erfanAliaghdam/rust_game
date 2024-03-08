@@ -1,4 +1,4 @@
-use std::{io::{stdout, Stdout, Write}, thread, time::{self, Duration}};
+use std::{io::{stdout, Stdout, Write, Result}, thread, time::{self, Duration}};
 
 use crossterm::{
     cursor::{Hide, MoveTo}, event::{poll, read, Event, KeyCode}, style::Print, terminal::{enable_raw_mode, size, Clear}, ExecutableCommand, QueueableCommand
@@ -10,7 +10,7 @@ struct World {
     max_columns: u16,
     max_rows: u16,
     map: Vec<(u16, u16)>,
-    die: bool
+    died: bool
 }
 
 fn draw(mut sc: &Stdout, mut world: &World) -> std::io::Result<()>  {
@@ -18,13 +18,13 @@ fn draw(mut sc: &Stdout, mut world: &World) -> std::io::Result<()>  {
 
     for l in 0..world.map.len(){
         sc.queue(MoveTo(0, l as u16))?;
-        sc.queue(Print("+".repeat(world.map[l].0 as usize)))?;
+        sc.queue(Print(".".repeat(world.map[l].0 as usize)))?;
         sc.queue(MoveTo(world.map[l].1, l as u16))?;
-        sc.queue(Print("+".repeat((world.max_columns - world.map[l].1) as usize)))?;
+        sc.queue(Print(".".repeat((world.max_columns - world.map[l].1) as usize)))?;
     }
 
     sc.queue(MoveTo(world.player_position_x, world.player_position_y))?;
-    sc.queue(Print("p"))?;
+    sc.queue(Print("^"))?;
     sc.flush()?;
 
     Ok(())
@@ -44,6 +44,16 @@ fn sleep_on_draw(sleep_milis: u16) {
 }
 
 
+fn physics(mut world: World) -> Result<World>{
+    // check if player hits the ground
+    if world.player_position_x < world.map[world.player_position_y as usize].0 ||
+        world.player_position_x > world.map[world.player_position_y as usize].1 {
+            world.died = true;
+        }
+
+    Ok(world)
+}
+
 fn main() -> std::io::Result<()> {
     // initialize the screen
     let mut sc = stdout();
@@ -59,9 +69,9 @@ fn main() -> std::io::Result<()> {
         max_columns: max_columns,
         max_rows: max_lines,
         map: vec![(max_columns/2-5, max_columns/2+5); max_lines as usize],
-        die: false,
+        died: false,
     }; 
-    while !world.die{
+    while !world.died{
         // read inputs
         if poll(Duration::from_millis(10))?{
             let key = read()?;
@@ -105,6 +115,7 @@ fn main() -> std::io::Result<()> {
             }
         }
         //do some physics
+        world = physics(world).unwrap();
         //draw the world
         draw(&sc, &world)?;
         sleep_on_draw(10);
