@@ -3,6 +3,8 @@ use std::{io::{stdout, Stdout, Write, Result}, thread, time::{self, Duration}};
 use crossterm::{
     cursor::{Hide, MoveTo}, event::{poll, read, Event, KeyCode}, style::Print, terminal::{enable_raw_mode, size, Clear}, ExecutableCommand, QueueableCommand
 };
+use rand::Rng;
+
 
 struct World {
     player_position_x: u16,
@@ -10,7 +12,9 @@ struct World {
     max_columns: u16,
     max_rows: u16,
     map: Vec<(u16, u16)>,
-    died: bool
+    died: bool,
+    next_right: u16,
+    next_left: u16,
 }
 
 fn draw(mut sc: &Stdout, mut world: &World) -> std::io::Result<()>  {
@@ -18,9 +22,9 @@ fn draw(mut sc: &Stdout, mut world: &World) -> std::io::Result<()>  {
 
     for l in 0..world.map.len(){
         sc.queue(MoveTo(0, l as u16))?;
-        sc.queue(Print(".".repeat(world.map[l].0 as usize)))?;
+        sc.queue(Print("+".repeat(world.map[l].0 as usize)))?;
         sc.queue(MoveTo(world.map[l].1, l as u16))?;
-        sc.queue(Print(".".repeat((world.max_columns - world.map[l].1) as usize)))?;
+        sc.queue(Print("+".repeat((world.max_columns - world.map[l].1) as usize)))?;
     }
 
     sc.queue(MoveTo(world.player_position_x, world.player_position_y))?;
@@ -45,12 +49,38 @@ fn sleep_on_draw(sleep_milis: u16) {
 
 
 fn physics(mut world: World) -> Result<World>{
+    let mut rng = rand::thread_rng();
     // check if player hits the ground
     if world.player_position_x < world.map[world.player_position_y as usize].0 ||
         world.player_position_x > world.map[world.player_position_y as usize].1 {
             world.died = true;
         }
 
+    for l in (0..world.map.len() - 1).rev() {
+        world.map[l+1] = world.map[l];
+    }
+    if world.next_left > world.map[0].0 {
+        world.map[0].0 += 1;
+    }
+    if world.next_left < world.map[0].0 {
+        world.map[0].0 -= 1;
+    }
+    if world.next_right > world.map[0].1 {
+        world.map[0].1 += 1;
+    }
+    if world.next_right < world.map[0].1 {
+        world.map[0].1 -= 1;
+    }
+    if world.next_left == world.map[0].0 {
+        world.next_left = rng.gen_range(
+            world.next_left-5..world.next_left+5
+        );
+    }
+    if world.next_right == world.map[0].1 {
+        world.next_right = rng.gen_range(
+            world.next_right-5..world.next_right+5
+        );
+    }
     Ok(world)
 }
 
@@ -70,6 +100,8 @@ fn main() -> std::io::Result<()> {
         max_rows: max_lines,
         map: vec![(max_columns/2-5, max_columns/2+5); max_lines as usize],
         died: false,
+        next_left: max_columns / 2 -7,
+        next_right: max_columns / 2 + 7
     }; 
     while !world.died{
         // read inputs
@@ -118,7 +150,7 @@ fn main() -> std::io::Result<()> {
         world = physics(world).unwrap();
         //draw the world
         draw(&sc, &world)?;
-        sleep_on_draw(10);
+        sleep_on_draw(50);
     }
     finish_game(&sc)?;
     Ok(())
